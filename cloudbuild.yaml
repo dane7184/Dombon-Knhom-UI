@@ -1,0 +1,56 @@
+substitutions:
+  # Default values (e.g., your staging/dev environment)
+  _IMAGE_TAG: 'latest'
+  _NEXT_PUBLIC_API_URL: 'https://api.test.dombonkhnom.com/api/v1/'
+  _VM_INSTANCE: 'instance-20260619-023008'
+  _VM_ZONE: 'asia-southeast1-a'
+  _SSH_USER: 'roa'
+  _APP_DIR: '/app/dombon_khnom'
+
+steps:
+  # Step 0: Pull the existing image to use as a cache source
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'pull-cached-image'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull asia-southeast1-docker.pkg.dev/$PROJECT_ID/dombon-repo/dombon-ui:$_IMAGE_TAG || true
+
+  # Step 1: Build Next.js using both BuildKit cache mounts and the pulled image layers
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-frontend-image'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '--cache-from'
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/dombon-repo/dombon-ui:$_IMAGE_TAG'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=$_NEXT_PUBLIC_API_URL'
+      - '-t'
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/dombon-repo/dombon-ui:$_IMAGE_TAG'
+      - '.'
+
+  # Step 2: Push the Image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-frontend-image'
+    args:
+      - 'push'
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/dombon-repo/dombon-ui:$_IMAGE_TAG'
+
+  # Step 3: Connect via IAP tunnel and update docker-compose
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-to-gcp-vm'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud compute ssh $_SSH_USER@$_VM_INSTANCE \
+          --project=$PROJECT_ID \
+          --zone=$_VM_ZONE \
+          --tunnel-through-iap \
+          --command="gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://asia-southeast1-docker.pkg.dev && cd $_APP_DIR && docker compose pull nextjs && docker compose up -d nextjs"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
