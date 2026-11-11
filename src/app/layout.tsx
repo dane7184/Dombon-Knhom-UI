@@ -1,20 +1,23 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import "leaflet/dist/leaflet.css";
 import Providers from "@/providers/providers";
 import { auth } from "@/lib/auth";
 import { ReactNode } from "react";
-import { Fredoka } from "next/font/google";
 import { FRONTEND_URL } from "@/lib/url";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+// Self-hosted (instead of next/font/google) so builds don't depend on fetching Google Fonts.
+const geist = localFont({
+  src: "../../public/font/Geist-latin-variable.woff2",
+  weight: "100 900",
+  variable: "--font-sans",
+});
 
-const fredoka = Fredoka({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+const fredoka = localFont({
+  src: "../../public/font/Fredoka-latin-500-700.woff2",
+  weight: "500 700",
   variable: "--font-rounded",
 });
 const poppins = localFont({
